@@ -31,9 +31,13 @@ rebuilding, and require a separate reviewed publication operation.
 ## Profiles and safety
 
 Both profiles use the same source, feeds and package selection. Production adds
-only `/etc/os298-firmware.json`; it does not embed SSH authorization, DNSSEC
-bootstrap state or recovery network defaults. It requires an existing managed
-installation and a reviewed settings-preservation backup. Its SD output is not
+only `/etc/os298-firmware.json`; it does not embed SSH authorization, custom
+DNSSEC bootstrap overrides or recovery network defaults. Unbound itself ships
+`/etc/unbound/root.key`: production must match that exact pinned-feed default,
+never the custom recovery seed. This legacy vendor default is not proof of a
+usable post-rollover trust anchor. Production requires an existing managed
+installation, an audited backup that restores valid mutable DNSSEC state, and
+post-upgrade DNSSEC verification; otherwise deployment must block. Its SD output is not
 an OS298 recovery bootstrap image. Recovery adds the public OS298 SSH key,
 public DNSSEC bootstrap anchor and initial LAN4 defaults; it is for explicitly
 authorized provisioning only, never ordinary settings-preserving updates.

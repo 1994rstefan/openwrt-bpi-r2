@@ -19,8 +19,13 @@ def identity():
     sha = output("git", "rev-parse", "HEAD")
     if sha != os.environ["EXPECTED_SHA"] or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("Source identity mismatch")
+    upstream = json.loads(Path("bpi-r2/upstream.json").read_text())
+    if upstream["release"] != "25.12.5" or not re.fullmatch(r"[0-9a-f]{40}", upstream["commit"]):
+        raise ValueError("Invalid reviewed upstream baseline")
+    subprocess.run(["git", "merge-base", "--is-ancestor", upstream["commit"], sha], check=True)
     return {"schema": 1, "repository": os.environ["GITHUB_REPOSITORY"], "source_sha": sha,
-            "profile": os.environ["PROFILE"], "upstream_release": "25.12.5",
+            "profile": os.environ["PROFILE"], "upstream_release": upstream["release"],
+            "upstream_commit": upstream["commit"],
             "board": "bananapi,bpi-r2", "target": "mediatek/mt7623",
             "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
             "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
@@ -32,6 +37,26 @@ def one(pattern):
     if len(matches) != 1:
         raise ValueError(f"Expected exactly one {pattern}, found {len(matches)}")
     return matches[0]
+
+
+def check_profile(root, profile, vendor_anchor, recovery_anchor):
+    """Distinguish immutable package defaults from custom recovery bootstrap."""
+    anchor = root / "etc/unbound/root.key"
+    if profile == "production":
+        for forbidden in ("etc/uci-defaults/99-os298-recovery", "etc/dropbear/authorized_keys"):
+            if (root / forbidden).exists():
+                raise ValueError(f"Production image contains recovery bootstrap: {forbidden}")
+        if anchor.read_bytes() != vendor_anchor.read_bytes():
+            raise ValueError("Production DNSSEC default differs from the pinned package source")
+    elif profile == "recovery":
+        if anchor.read_bytes() != recovery_anchor.read_bytes():
+            raise ValueError("Recovery DNSSEC bootstrap differs from the reviewed recovery anchor")
+    else:
+        raise ValueError("Unsupported profile")
+    return {"packaged_anchor_sha256": hashlib.sha256(anchor.read_bytes()).hexdigest(),
+            "anchor_origin": "pinned-feed-default" if profile == "production" else "reviewed-recovery-bootstrap",
+            "requires_preserved_runtime_state": profile == "production",
+            "packaged_seed_is_runtime_acceptance": False}
 
 
 def bundle():
@@ -62,10 +87,9 @@ def bundle():
     root = roots[0]
     if (root / "etc/uci-defaults/31_bpi-r2-fit-selectors").exists():
         raise ValueError("Unapproved boot-environment migration included")
-    if meta["profile"] == "production":
-        for forbidden in ("etc/uci-defaults/99-os298-recovery", "etc/dropbear/authorized_keys", "etc/unbound/root.key"):
-            if (root / forbidden).exists():
-                raise ValueError(f"Production image contains bootstrap state: {forbidden}")
+    meta["dnssec"] = check_profile(root, meta["profile"],
+                                    Path("feeds/packages/net/unbound/files/root.key"),
+                                    Path("bpi-r2/files/recovery/etc/unbound/root.key"))
     for source in (image, sdcard, manifest):
         shutil.copy2(source, destination / source.name)
     shutil.copy2(".config", destination / "config.buildinfo")
