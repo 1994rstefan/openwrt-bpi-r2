@@ -1,0 +1,42 @@
+#!/bin/sh
+# This file is included ONLY in the recovery profile, never production updates.
+set -eu
+uci set system.@system[0].hostname='router-edge'
+uci set dropbear.@dropbear[0].PasswordAuth='off'
+uci set dropbear.@dropbear[0].RootPasswordAuth='off'
+uci commit system
+uci commit dropbear
+chmod 0600 /etc/dropbear/authorized_keys
+for device in $(uci show network | sed -n 's/^network\.\([^=]*\)=device$/\1/p'); do
+    if [ "$(uci -q get "network.$device.name")" = br-lan ]; then
+        uci -q del_list "network.$device.ports=lan3" || true
+    fi
+done
+uci -q delete firewall.recovery_zone || true
+uci batch <<'UCI'
+set network.recovery=interface
+set network.recovery.device='lan3'
+set network.recovery.proto='static'
+set network.recovery.ipaddr='10.194.116.1/16'
+set dhcp.recovery=dhcp
+set dhcp.recovery.interface='recovery'
+set dhcp.recovery.ignore='1'
+set dhcp.recovery.ra='disabled'
+set dhcp.recovery.dhcpv6='disabled'
+set firewall.recovery_zone=zone
+set firewall.recovery_zone.name='recovery'
+add_list firewall.recovery_zone.network='recovery'
+set firewall.recovery_zone.input='REJECT'
+set firewall.recovery_zone.output='ACCEPT'
+set firewall.recovery_zone.forward='REJECT'
+set firewall.recovery_allow_management=rule
+set firewall.recovery_allow_management.name='Allow-Recovery-Management'
+set firewall.recovery_allow_management.src='recovery'
+set firewall.recovery_allow_management.src_ip='10.194.255.34/32'
+set firewall.recovery_allow_management.proto='tcp'
+set firewall.recovery_allow_management.dest_port='22 443'
+set firewall.recovery_allow_management.target='ACCEPT'
+commit network
+commit dhcp
+commit firewall
+UCI

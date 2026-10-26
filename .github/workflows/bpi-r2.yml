@@ -1,0 +1,134 @@
+name: BPI-R2 firmware
+run-name: BPI-R2 ${{ inputs.profile || 'validation' }} / ${{ inputs.request_id || github.event_name }}
+
+on:
+  push:
+    branches: ['bpi-r2/25.12']
+  pull_request:
+    branches: ['bpi-r2/25.12']
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact 40-character source commit; must match the selected workflow ref
+        required: true
+        type: string
+      request_id:
+        description: Unique operator request identifier (letters, digits, dot, hyphen)
+        required: true
+        type: string
+      profile:
+        description: Production retains configuration; recovery is for fresh provisioning only
+        required: true
+        type: choice
+        options: [production, recovery]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bpi-r2-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ inputs.request_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate BPI-R2 inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s bpi-r2/tests -v
+      - run: bash -n bpi-r2/build.sh
+      - run: sh -n bpi-r2/files/recovery/etc/uci-defaults/99-os298-recovery
+      - name: Bind explicit build request to this exact workflow revision
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,79}$ ]]
+          test "$GITHUB_REF" = refs/heads/bpi-r2/25.12
+
+  build:
+    name: Build BPI-R2 candidate
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      PROFILE: ${{ inputs.profile || 'production' }}
+      EXPECTED_SHA: ${{ github.sha }}
+      JOBS: '4'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build isolated compiler environment
+        run: |
+          docker build --build-arg BUILD_UID="$(id -u)" --build-arg BUILD_GID="$(id -g)" \
+            -f bpi-r2/Containerfile -t bpi-r2-builder .
+          printf 'BUILDER_IMAGE_ID=%s\n' "$(docker image inspect bpi-r2-builder --format '{{.Id}}')" >> "$GITHUB_ENV"
+      - name: Compile and validate exact candidate
+        run: |
+          docker run --rm --volume "$GITHUB_WORKSPACE:/build/openwrt" \
+            --env GITHUB_ACTIONS --env GITHUB_REPOSITORY --env GITHUB_RUN_ID \
+            --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW_REF --env EXPECTED_SHA \
+            --env PROFILE --env JOBS --env BUILDER_IMAGE_ID \
+            bpi-r2-builder bash bpi-r2/build.sh
+      - name: Retain candidate for attestation and independent import
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bpi-r2-${{ inputs.profile }}-${{ github.run_id }}.${{ github.run_attempt }}
+          path: bpi-r2-${{ inputs.profile }}-${{ github.run_id }}.${{ github.run_attempt }}.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Retain diagnostics on build failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bpi-r2-failure-${{ github.run_id }}.${{ github.run_attempt }}
+          path: |
+            logs/
+            .config
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish:
+    name: Attest and publish unapproved candidate
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      # No source checkout or execution of candidate scripts in this privileged job.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bpi-r2-${{ inputs.profile }}-${{ github.run_id }}.${{ github.run_attempt }}
+          path: publish
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
+        with:
+          subject-path: publish/*.tar.gz
+      - name: Publish new candidate without replacing existing bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          tag="candidate-${PROFILE}-${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          printf '%s\n' 'CI candidate only: NOT approved for installation.' \
+            "Source: $GITHUB_SHA" "Profile: $PROFILE" \
+            "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > notes.txt
+          sha256sum publish/*.tar.gz > publish/bundle.sha256
+          gh release create "$tag" publish/* --target "$GITHUB_SHA" \
+            --title "$tag" --notes-file notes.txt --prerelease --latest=false
