@@ -44,6 +44,12 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('--clobber', workflow)
         self.assertNotIn('pull_request_target', workflow)
 
+    def test_owner_fork_builds_are_explicit_not_push_or_pr_triggered(self):
+        workflow = (ROOT / '.github/workflows/bpi-r2.yml').read_text()
+        self.assertNotIn('pull_request:', workflow)
+        self.assertNotIn("github.event_name == 'pull_request'", workflow)
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", workflow)
+
     def test_no_automatic_boot_environment_migration(self):
         self.assertFalse((ROOT / 'target/linux/mediatek/mt7623/base-files/etc/uci-defaults/31_bpi-r2-fit-selectors').exists())
 

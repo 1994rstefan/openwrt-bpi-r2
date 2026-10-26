@@ -2,8 +2,9 @@
 
 This directory is the firmware source of truth for OS298. The default
 `bpi-r2/25.12` branch follows reviewed upstream 25.12 release tags, not upstream
-main. Merge updates through short-lived branches and review source/feed pins,
-hardware changes, resolved package deltas and CI results together. Never force
+main. Review source/feed pins, hardware changes, resolved package deltas and CI
+results together. Direct changes to the BPI branch are supported; PRs and a
+second reviewer are not required for this owner-operated fork. Never force
 push release history or overwrite published artifacts. Keep old branches/tags
 until their consumers and recovery evidence have been inventoried.
 
@@ -12,8 +13,11 @@ until their consumers and recovery evidence have been inventoried.
 Build only through `.github/workflows/bpi-r2.yml` on GitHub Actions. Dispatch on
 `bpi-r2/25.12` with its exact current commit SHA, a unique request ID and either
 `production` or `recovery`. Each run attempt gets a unique candidate identity.
-PR builds cannot publish; pushes validate inputs but do not publish firmware.
+Pushes run short input tests only; full builds are explicit manual dispatches.
+There are no automatic PR builds or review gates for this single-device fork.
 Candidate publication creates a prerelease, not deployment approval.
+Never create upstream PRs or push changes to `openwrt/openwrt` without a new
+explicit owner request; upstream is a read-only source for this project.
 
 The pinned container base and feed commits plus recorded toolchain/environment
 metadata support traceability; bit-for-bit reproducibility is not claimed. The

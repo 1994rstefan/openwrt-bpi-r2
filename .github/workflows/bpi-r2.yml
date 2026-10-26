@@ -4,8 +4,6 @@ run-name: BPI-R2 ${{ inputs.profile || 'validation' }} / ${{ inputs.request_id |
 on:
   push:
     branches: ['bpi-r2/25.12']
-  pull_request:
-    branches: ['bpi-r2/25.12']
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -55,11 +53,11 @@ jobs:
   build:
     name: Build BPI-R2 candidate
     needs: validate
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      PROFILE: ${{ inputs.profile || 'production' }}
+      PROFILE: ${{ inputs.profile }}
       EXPECTED_SHA: ${{ github.sha }}
       JOBS: '4'
     steps:
