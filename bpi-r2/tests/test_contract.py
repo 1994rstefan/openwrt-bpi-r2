@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import tempfile
 import json
+import hashlib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +50,11 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('pull_request:', workflow)
         self.assertNotIn("github.event_name == 'pull_request'", workflow)
         self.assertIn("if: github.event_name == 'workflow_dispatch'", workflow)
+
+    def test_recovery_authorization_is_the_reviewed_public_key(self):
+        key = (ROOT / 'bpi-r2/files/recovery/etc/dropbear/authorized_keys').read_bytes()
+        self.assertEqual(hashlib.sha256(key).hexdigest(),
+                         '039ca07f5ced98e7ba40f91ff259c3a97d9f6b1c7c733a76107f043efc5e3a18')
 
     def test_no_automatic_boot_environment_migration(self):
         self.assertFalse((ROOT / 'target/linux/mediatek/mt7623/base-files/etc/uci-defaults/31_bpi-r2-fit-selectors').exists())

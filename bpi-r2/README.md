@@ -45,6 +45,10 @@ post-upgrade DNSSEC verification; otherwise deployment must block. Its SD output
 an OS298 recovery bootstrap image. Recovery adds the public OS298 SSH key,
 public DNSSEC bootstrap anchor and initial LAN4 defaults; it is for explicitly
 authorized provisioning only, never ordinary settings-preserving updates.
+Recovery provenance includes the built authorization file's SHA-256; OS298 import
+requires it to match the canonical control-node public key. Key rotation must
+update both projects explicitly. Recovery build/import and hardware acceptance
+remain separate from a successful production candidate.
 
 The BPI kernel includes the optional DS3231 overlay and WRRD fix. The production
 FIT must support the actual persistent selector. Kernel ABI is recorded rather

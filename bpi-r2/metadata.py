@@ -90,6 +90,11 @@ def bundle():
     meta["dnssec"] = check_profile(root, meta["profile"],
                                     Path("feeds/packages/net/unbound/files/root.key"),
                                     Path("bpi-r2/files/recovery/etc/unbound/root.key"))
+    if meta["profile"] == "recovery":
+        authorization = Path("bpi-r2/files/recovery/etc/dropbear/authorized_keys").read_bytes()
+        if (root / "etc/dropbear/authorized_keys").read_bytes() != authorization:
+            raise ValueError("Recovery SSH authorization differs from the reviewed source")
+        meta["recovery_authorized_keys_sha256"] = hashlib.sha256(authorization).hexdigest()
     for source in (image, sdcard, manifest):
         shutil.copy2(source, destination / source.name)
     shutil.copy2(".config", destination / "config.buildinfo")
