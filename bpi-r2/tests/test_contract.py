@@ -75,6 +75,16 @@ class ContractTests(unittest.TestCase):
         for name in ('kmod-rtc-ds1307', 'kmod-bonding', 'kmod-tls', 'kmod-wireguard', 'chrony-nts', 'unbound-daemon'):
             self.assertIn(name, packages)
 
+    def test_future_images_do_not_include_unneeded_sftp_server(self):
+        negative = '# CONFIG_PACKAGE_openssh-sftp-server is not set'
+        self.assertIn(negative, (ROOT / 'bpi-r2/config.seed').read_text().splitlines())
+        self.assertNotIn('openssh-sftp-server', (ROOT / 'bpi-r2/required-packages.txt').read_text().splitlines())
+        floors = json.loads((ROOT / 'bpi-r2/package-floors.json').read_text())
+        self.assertNotIn('openssh-sftp-server', floors['packages'])
+        config.check(negative, negative)
+        with self.assertRaises(ValueError):
+            config.check(negative, 'CONFIG_PACKAGE_openssh-sftp-server=y')
+
     def test_release_and_repository_urls_follow_the_selected_baseline(self):
         build = (ROOT / 'bpi-r2/build.sh').read_text()
         self.assertIn('release=$(python3 bpi-r2/metadata.py release)', build)

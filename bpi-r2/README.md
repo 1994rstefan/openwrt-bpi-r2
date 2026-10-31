@@ -40,6 +40,17 @@ a static build guard, not a fresh deployment preflight or installation approval.
 Keep `kmod-tls` explicitly included instead of silently dropping it. Curl 8.23
 removes SMB support; OS298 uses it for HTTP(S), not SMB transfers.
 
+Owner decision, 2026-10-31: future images explicitly disable
+`openssh-sftp-server` and do not require it. OS298 uses SSH piped transfer; SFTP
+was inherited from the retired recipe without an actual requirement. Keep the
+already verified `candidate-production-41215850400.1` unchanged for the intended
+upgrade rather than recompiling for this package alone. It temporarily contains
+SFTP; the owner will remove it manually after upgrade. Do not add an automatic
+uninstall hook, replace its published assets or dispatch a full build for this
+change. Refresh installed package floors after the manual cleanup, not from a
+transient post-upgrade installation that still includes SFTP. Device installation
+still requires the ordinary protection/preflight and maintenance-window gates.
+
 Build only through `.github/workflows/bpi-r2.yml` on GitHub Actions. Dispatch on
 `bpi-r2/25.12` with its exact current commit SHA, a unique request ID and either
 `production` or `recovery`. Each run attempt gets a unique candidate identity.

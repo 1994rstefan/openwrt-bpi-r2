@@ -17,6 +17,12 @@
   the selected baseline and security review. The WRRD fix is upstream in the
   selected kernel; never reapply the obsolete local backport. Keep compiled-source
   checks and package floors; do not hide a downgrade/removal by weakening them.
+- Future image configs explicitly disable `openssh-sftp-server`; OS298 transfers
+  files over piped SSH. The owner chose to reuse verified candidate
+  `candidate-production-41215850400.1` unchanged, accepting SFTP temporarily and
+  removing it manually after upgrade. Do not rebuild for this package alone,
+  rewrite release assets or add an automatic uninstall hook. Update installed
+  floors after the manual cleanup; do not turn temporary SFTP into a requirement.
 - Production must not include custom recovery network/authorization overrides.
   Unbound's root.key must match the pinned feed. Its immutable package seed does
   not prove valid runtime DNSSEC state; deployment must preserve the live key

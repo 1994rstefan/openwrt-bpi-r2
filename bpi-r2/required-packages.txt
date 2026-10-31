@@ -15,7 +15,6 @@ luci-app-chrony
 luci-app-unbound
 luci-proto-wireguard
 luci-ssl
-openssh-sftp-server
 rpcd-mod-luci
 uboot-envtools
 uhttpd
