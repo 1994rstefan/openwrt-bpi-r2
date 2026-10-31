@@ -19,6 +19,8 @@ def upstream_baseline():
     upstream = json.loads(Path("bpi-r2/upstream.json").read_text())
     if not re.fullmatch(r"25\.12\.\d+", upstream["release"]) or not re.fullmatch(r"[0-9a-f]{40}", upstream["commit"]):
         raise ValueError("Invalid reviewed upstream baseline")
+    if not re.fullmatch(r"[0-9a-f]{40}", upstream.get("source_commit", "")) or upstream.get("source_branch") != "openwrt-25.12":
+        raise ValueError("An exact reviewed 25.12 stable source snapshot is required")
     return upstream
 
 
@@ -27,10 +29,13 @@ def identity():
     if sha != os.environ["EXPECTED_SHA"] or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("Source identity mismatch")
     upstream = upstream_baseline()
-    subprocess.run(["git", "merge-base", "--is-ancestor", upstream["commit"], sha], check=True)
+    subprocess.run(["git", "merge-base", "--is-ancestor", upstream["commit"], upstream["source_commit"]], check=True)
+    subprocess.run(["git", "merge-base", "--is-ancestor", upstream["source_commit"], sha], check=True)
     return {"schema": 1, "repository": os.environ["GITHUB_REPOSITORY"], "source_sha": sha,
             "profile": os.environ["PROFILE"], "upstream_release": upstream["release"],
             "upstream_commit": upstream["commit"],
+            "upstream_source_commit": upstream["source_commit"],
+            "upstream_source_branch": upstream["source_branch"],
             "board": "bananapi,bpi-r2", "target": "mediatek/mt7623",
             "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
             "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
@@ -70,6 +75,18 @@ def check_wrrd(text):
         raise ValueError("Kernel does not contain the reviewed WRRD enable condition")
 
 
+def check_package_floors(packages, floors, compare):
+    """No removed or older installed package may silently enter a candidate."""
+    if not isinstance(floors, dict) or not floors:
+        raise ValueError("Nonempty reviewed installed package floors are required")
+    for name, version in floors.items():
+        if name not in packages:
+            raise ValueError(f"Installed package removed without review: {name}")
+        comparison = compare(packages[name], version)
+        if comparison not in ("=", ">"):
+            raise ValueError(f"Installed package downgraded or comparison invalid: {name}: {version} -> {packages[name]}")
+
+
 def bundle():
     meta = identity()
     destination = Path("candidate")
@@ -84,6 +101,15 @@ def bundle():
     required = set(Path("bpi-r2/required-packages.txt").read_text().splitlines())
     if missing := required - packages.keys():
         raise ValueError(f"Missing required packages: {sorted(missing)}")
+    floors_path = Path("bpi-r2/package-floors.json")
+    floors = json.loads(floors_path.read_text())
+    check_package_floors(packages, floors["packages"],
+                         lambda candidate, installed: output("staging_dir/host/bin/apk", "--no-network",
+                                                             "--repositories-file", "/dev/null", "version", "-t",
+                                                             candidate, installed))
+    meta["package_floor_review"] = {"result": "PASS", "observed_at": floors["observed_at"],
+                                    "installed_build": floors["installed_build"], "count": len(floors["packages"]),
+                                    "sha256": hashlib.sha256(floors_path.read_bytes()).hexdigest()}
     image = one("*-bananapi_bpi-r2-squashfs-sysupgrade.itb")
     sdcard = one("*-bananapi_bpi-r2-sdcard.img.gz")
     fit = output("staging_dir/host/bin/mkimage", "-l", str(image))

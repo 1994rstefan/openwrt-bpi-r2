@@ -35,6 +35,8 @@ class ContractTests(unittest.TestCase):
         baseline = json.loads((ROOT / 'bpi-r2/upstream.json').read_text())
         self.assertEqual(baseline['release'], '25.12.6')
         self.assertEqual(baseline['commit'], '64900e756efa667774214f9c6b17c113222e01f7')
+        self.assertEqual(baseline['source_commit'], '8303e9b2a004a6c3754aaa1edb32cfc7c0cfe55b')
+        self.assertEqual(baseline['source_branch'], 'openwrt-25.12')
 
     def test_container_and_actions_are_digest_pinned(self):
         container = (ROOT / "bpi-r2/Containerfile").read_text()
@@ -86,6 +88,24 @@ class ContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 metadata.check_wrrd(text)
         self.assertFalse((ROOT / 'target/linux/mediatek/patches-6.12/950-i2c-mt65xx-fix-wrrd-without-auto-restart.patch').exists())
+
+    def test_package_floors_fail_closed_for_removal_downgrade_or_invalid_comparison(self):
+        metadata.check_package_floors({'curl': 'new'}, {'curl': 'old'}, lambda new, old: '>')
+        metadata.check_package_floors({'curl': 'same'}, {'curl': 'same'}, lambda new, old: '=')
+        for comparison in ('<', '', 'unrecognized'):
+            with self.assertRaises(ValueError):
+                metadata.check_package_floors({'curl': 'older'}, {'curl': 'installed'}, lambda new, old: comparison)
+        with self.assertRaises(ValueError):
+            metadata.check_package_floors({}, {'curl': 'installed'}, lambda new, old: '>')
+        with self.assertRaises(ValueError):
+            metadata.check_package_floors({'curl': 'candidate'}, {}, lambda new, old: '>')
+
+    def test_live_package_floors_include_runtime_and_kernel_state(self):
+        floors = json.loads((ROOT / 'bpi-r2/package-floors.json').read_text())
+        self.assertEqual(floors['installed_build'], '25.12.5-bpi_r2.3')
+        self.assertEqual(floors['observed_at'], '2026-10-31T15:18:30Z')
+        for name in ('kernel', 'libc', 'curl', 'unbound-daemon', 'kmod-tls'):
+            self.assertIn(name, floors['packages'])
 
     def test_production_only_accepts_exact_vendor_anchor_not_custom_bootstrap(self):
         with tempfile.TemporaryDirectory() as directory:

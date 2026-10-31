@@ -1,4 +1,7 @@
 {
   "release": "25.12.6",
-  "commit": "64900e756efa667774214f9c6b17c113222e01f7"
+  "commit": "64900e756efa667774214f9c6b17c113222e01f7",
+  "source_commit": "8303e9b2a004a6c3754aaa1edb32cfc7c0cfe55b",
+  "source_branch": "openwrt-25.12",
+  "reviewed_at": "2026-10-31"
 }

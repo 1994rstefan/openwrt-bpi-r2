@@ -12,8 +12,13 @@
   `.github/workflows/bpi-r2.yml` on GitHub Actions, never on the local machine.
   Pushes run short checks; full builds require explicit dispatch with exact SHA,
   request ID and production/recovery profile. Local offline unit tests are fine.
+- `upstream.json` pins the 25.12.6 tag and reviewed 25.12 stable source snapshot;
+  feeds use exact commits, not moving branch names. Read `bpi-r2/README.md` for
+  the selected baseline and security review. The WRRD fix is upstream in the
+  selected kernel; never reapply the obsolete local backport. Keep compiled-source
+  checks and package floors; do not hide a downgrade/removal by weakening them.
 - Production must not include custom recovery network/authorization overrides.
-  Unbound's root.key must match the pinned feed. Its legacy package seed does
+  Unbound's root.key must match the pinned feed. Its immutable package seed does
   not prove valid runtime DNSSEC state; deployment must preserve the live key
   and verify DNSSEC. Recovery files are for separately authorized provisioning.
 - Keep exact source/feed/container identities, package/FIT/ABI checks and
