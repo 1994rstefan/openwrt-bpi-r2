@@ -33,8 +33,8 @@ class ContractTests(unittest.TestCase):
 
     def test_upstream_baseline_is_an_exact_reviewed_release_commit(self):
         baseline = json.loads((ROOT / 'bpi-r2/upstream.json').read_text())
-        self.assertEqual(baseline['release'], '25.12.5')
-        self.assertRegex(baseline['commit'], r'^[0-9a-f]{40}$')
+        self.assertEqual(baseline['release'], '25.12.6')
+        self.assertEqual(baseline['commit'], '64900e756efa667774214f9c6b17c113222e01f7')
 
     def test_container_and_actions_are_digest_pinned(self):
         container = (ROOT / "bpi-r2/Containerfile").read_text()
@@ -50,6 +50,7 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('pull_request:', workflow)
         self.assertNotIn("github.event_name == 'pull_request'", workflow)
         self.assertIn("if: github.event_name == 'workflow_dispatch'", workflow)
+        self.assertEqual([path.name for path in (ROOT / '.github/workflows').glob('*.yml')], ['bpi-r2.yml'])
 
     def test_recovery_authorization_is_the_reviewed_public_key(self):
         key = (ROOT / 'bpi-r2/files/recovery/etc/dropbear/authorized_keys').read_bytes()
@@ -69,8 +70,22 @@ class ContractTests(unittest.TestCase):
 
     def test_rtc_and_network_packages_are_explicit(self):
         packages = (ROOT / 'bpi-r2/required-packages.txt').read_text().splitlines()
-        for name in ('kmod-rtc-ds1307', 'kmod-bonding', 'kmod-wireguard', 'chrony-nts', 'unbound-daemon'):
+        for name in ('kmod-rtc-ds1307', 'kmod-bonding', 'kmod-tls', 'kmod-wireguard', 'chrony-nts', 'unbound-daemon'):
             self.assertIn(name, packages)
+
+    def test_release_and_repository_urls_follow_the_selected_baseline(self):
+        build = (ROOT / 'bpi-r2/build.sh').read_text()
+        self.assertIn('release=$(python3 bpi-r2/metadata.py release)', build)
+        self.assertIn('"${release}-os298-', build)
+        self.assertNotIn('25.12.5', build)
+
+    def test_wrrd_fix_is_checked_in_kernel_source_not_duplicated(self):
+        marker = '/* checking if we can skip restart and optimize using WRRD mode */\n'
+        metadata.check_wrrd(marker + 'if (num == 2) {')
+        for text in ('unrelated source', marker + 'if (i2c->auto_restart && num == 2) {'):
+            with self.assertRaises(ValueError):
+                metadata.check_wrrd(text)
+        self.assertFalse((ROOT / 'target/linux/mediatek/patches-6.12/950-i2c-mt65xx-fix-wrrd-without-auto-restart.patch').exists())
 
     def test_production_only_accepts_exact_vendor_anchor_not_custom_bootstrap(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -15,13 +15,18 @@ def output(*args):
     return subprocess.check_output(args, text=True).strip()
 
 
+def upstream_baseline():
+    upstream = json.loads(Path("bpi-r2/upstream.json").read_text())
+    if not re.fullmatch(r"25\.12\.\d+", upstream["release"]) or not re.fullmatch(r"[0-9a-f]{40}", upstream["commit"]):
+        raise ValueError("Invalid reviewed upstream baseline")
+    return upstream
+
+
 def identity():
     sha = output("git", "rev-parse", "HEAD")
     if sha != os.environ["EXPECTED_SHA"] or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("Source identity mismatch")
-    upstream = json.loads(Path("bpi-r2/upstream.json").read_text())
-    if upstream["release"] != "25.12.5" or not re.fullmatch(r"[0-9a-f]{40}", upstream["commit"]):
-        raise ValueError("Invalid reviewed upstream baseline")
+    upstream = upstream_baseline()
     subprocess.run(["git", "merge-base", "--is-ancestor", upstream["commit"], sha], check=True)
     return {"schema": 1, "repository": os.environ["GITHUB_REPOSITORY"], "source_sha": sha,
             "profile": os.environ["PROFILE"], "upstream_release": upstream["release"],
@@ -59,6 +64,12 @@ def check_profile(root, profile, vendor_anchor, recovery_anchor):
             "packaged_seed_is_runtime_acceptance": False}
 
 
+def check_wrrd(text):
+    marker = "/* checking if we can skip restart and optimize using WRRD mode */"
+    if not re.search(re.escape(marker) + r"\s*if\s*\(num == 2\)", text):
+        raise ValueError("Kernel does not contain the reviewed WRRD enable condition")
+
+
 def bundle():
     meta = identity()
     destination = Path("candidate")
@@ -85,6 +96,11 @@ def bundle():
     if len(roots) != 1:
         raise ValueError("Cannot identify built root filesystem")
     root = roots[0]
+    i2c_sources = list(Path("build_dir").glob("target-*/linux-mediatek_mt7623/linux-*/drivers/i2c/busses/i2c-mt65xx.c"))
+    if len(i2c_sources) != 1:
+        raise ValueError("Cannot identify compiled MediaTek I2C kernel source")
+    check_wrrd(i2c_sources[0].read_text())
+    meta["wrrd_source_check"] = True
     if (root / "etc/uci-defaults/31_bpi-r2-fit-selectors").exists():
         raise ValueError("Unapproved boot-environment migration included")
     meta["dnssec"] = check_profile(root, meta["profile"],
@@ -130,7 +146,9 @@ def bundle():
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "identity":
+    if sys.argv[1] == "release":
+        print(upstream_baseline()["release"])
+    elif sys.argv[1] == "identity":
         Path("files/etc/os298-firmware.json").write_text(json.dumps(identity(), indent=2) + "\n")
     elif sys.argv[1] == "bundle":
         bundle()

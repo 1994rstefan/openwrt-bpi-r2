@@ -8,6 +8,7 @@ fit-check-sign
 kernel
 kmod-bonding
 kmod-rtc-ds1307
+kmod-tls
 kmod-wireguard
 luci
 luci-app-chrony

@@ -20,9 +20,10 @@ if [ "$profile" = recovery ]; then
 fi
 python3 bpi-r2/metadata.py identity
 cp bpi-r2/config.seed .config
-version="25.12.5-os298-${profile}-${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+release=$(python3 bpi-r2/metadata.py release)
+version="${release}-os298-${profile}-${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
 printf 'CONFIG_VERSION_NUMBER="%s"\nCONFIG_VERSION_CODE="r%s"\n' "$version" "${EXPECTED_SHA:0:12}" >> .config
-printf 'CONFIG_VERSION_REPO="https://downloads.openwrt.org/releases/25.12.5"\n' >> .config
+printf 'CONFIG_VERSION_REPO="https://downloads.openwrt.org/releases/%s"\n' "$release" >> .config
 make defconfig
 python3 bpi-r2/check-config.py bpi-r2/config.seed .config
 make -j"${JOBS:-4}" download
