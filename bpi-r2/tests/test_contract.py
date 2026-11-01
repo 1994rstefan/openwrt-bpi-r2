@@ -75,6 +75,28 @@ class ContractTests(unittest.TestCase):
         for name in ('kmod-rtc-ds1307', 'kmod-bonding', 'kmod-tls', 'kmod-wireguard', 'chrony-nts', 'unbound-daemon'):
             self.assertIn(name, packages)
 
+    def test_mdns_packages_have_inert_defaults_in_both_profiles(self):
+        seed = (ROOT / 'bpi-r2/config.seed').read_text()
+        self.assertIn('CONFIG_PACKAGE_avahi-nodbus-daemon=y', seed.splitlines())
+        for name in ('avahi-dbus-daemon', 'avahi-autoipd',
+                     'avahi-daemon-service-http', 'avahi-daemon-service-ssh'):
+            self.assertIn(f'# CONFIG_PACKAGE_{name} is not set', seed.splitlines())
+        packages = (ROOT / 'bpi-r2/required-packages.txt').read_text().splitlines()
+        for name in ('avahi-nodbus-daemon', 'libavahi-nodbus-support', 'libdaemon', 'libexpat'):
+            self.assertIn(name, packages)
+        floors = json.loads((ROOT / 'bpi-r2/package-floors.json').read_text())
+        self.assertEqual(floors['packages']['avahi-nodbus-daemon'], '0.9_rc5-r1')
+        self.assertEqual(floors['packages']['libavahi-nodbus-support'], '0.9_rc5-r1')
+        self.assertEqual(floors['packages']['libdaemon'], '0.14-r5')
+        self.assertEqual(floors['packages']['libexpat'], '2.8.4-r1')
+        default = (ROOT / 'bpi-r2/files/common/etc/avahi/avahi-daemon.conf').read_text()
+        for option in ('allow-interfaces=lo', 'enable-reflector=no', 'reflect-ipv=no',
+                       'disable-publishing=yes', 'enable-wide-area=no'):
+            self.assertIn(option, default.splitlines())
+        build = (ROOT / 'bpi-r2/build.sh').read_text()
+        self.assertLess(build.index('cp -a bpi-r2/files/common/. files/'),
+                        build.index('if [ "$profile" = recovery ]; then'))
+
     def test_future_images_do_not_include_unneeded_sftp_server(self):
         negative = '# CONFIG_PACKAGE_openssh-sftp-server is not set'
         self.assertIn(negative, (ROOT / 'bpi-r2/config.seed').read_text().splitlines())

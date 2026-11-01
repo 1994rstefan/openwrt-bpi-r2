@@ -75,6 +75,20 @@ rebuilding, and require a separate reviewed publication operation.
 
 ## Profiles and safety
 
+Future images include `avahi-nodbus-daemon` and its userspace dependencies for
+the owner-approved Trusted/Multimedia discovery feature (2026-11-01). Both
+profiles use a shared inert default: loopback-only, reflection off, publishing
+off and no wide-area DNS-SD. Ansible in the infrastructure repository owns
+activation and the exact two-VLAN allowlist; firmware does not open discovery
+firewall rules. A settings-preserving upgrade must retain the managed
+`/etc/avahi/avahi-daemon.conf` before first boot. The validator helper is
+reinstalled by Ansible, not restored as an old executable. Never start from the
+upstream publish-on-all-interfaces default. Source tests do not qualify a full
+build, first boot, recovery hardware or production installation. No new full
+build or firmware write is authorized merely by adding these image inputs.
+The four additional package floors record their observed 2026-11-01 installation
+separately; the original baseline/floors are not lowered or broadly refreshed.
+
 Both profiles use the same source, feeds and package selection. Production adds
 only `/etc/os298-firmware.json`; it does not embed SSH authorization, custom
 DNSSEC bootstrap overrides or recovery network defaults. Unbound itself ships

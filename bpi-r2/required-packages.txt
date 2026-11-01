@@ -1,4 +1,8 @@
 6in4
+avahi-nodbus-daemon
+libavahi-nodbus-support
+libdaemon
+libexpat
 ca-bundle
 chrony-nts
 curl

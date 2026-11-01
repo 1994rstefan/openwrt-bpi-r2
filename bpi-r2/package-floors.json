@@ -2,10 +2,19 @@
   "schema": 1,
   "observed_at": "2026-10-31T15:18:30Z",
   "installed_build": "25.12.5-bpi_r2.3",
+  "additional_observations": [
+    {
+      "observed_on": "2026-11-01",
+      "installed_build": "25.12.6-os298-production-41215850400.1",
+      "scope": "Approved mDNS additions only; previous package floors remain unchanged",
+      "packages": ["avahi-nodbus-daemon", "libavahi-nodbus-support", "libdaemon", "libexpat"]
+    }
+  ],
   "packages": {
     "6in4": "29",
     "apk-mbedtls": "3.0.5-r3",
     "attendedsysupgrade-common": "10",
+    "avahi-nodbus-daemon": "0.9_rc5-r1",
     "base-files": "1711~f5dae5ece4",
     "busybox": "1.37.0-r6",
     "ca-bundle": "20260816-r1",
@@ -89,15 +98,18 @@
     "kmod-usb3": "6.12.94-r1",
     "kmod-wireguard": "6.12.94-r1",
     "libatomic1": "14.3.0-r5",
+    "libavahi-nodbus-support": "0.9_rc5-r1",
     "libblkid1": "2.41.5-r1",
     "libblobmsg-json20260213": "2026.06.19~7dd12784-r1",
     "libc": "1.2.5-r5",
     "libcap": "2.69-r1",
     "libcomerr0": "1.47.3-r1",
+    "libdaemon": "0.14-r5",
     "libcurl4": "8.22.0-r1",
     "libe2p2": "1.47.3-r1",
     "libevent2-7": "2.1.12-r2",
     "libext2fs2": "1.47.3-r1",
+    "libexpat": "2.8.4-r1",
     "libf2fs6": "1.16.0-r4",
     "libgcc1": "14.3.0-r5",
     "libgmp10": "6.3.0-r2",

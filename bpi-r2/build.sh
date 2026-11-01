@@ -13,6 +13,7 @@ cp bpi-r2/feeds.conf feeds.conf
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 mkdir -p files/etc
+cp -a bpi-r2/files/common/. files/
 if [ "$profile" = recovery ]; then
     cp -a bpi-r2/files/recovery/. files/
     chmod 0755 files/etc/uci-defaults/99-os298-recovery
